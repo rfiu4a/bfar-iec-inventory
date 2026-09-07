@@ -16,6 +16,7 @@ type MaterialForm = {
   name: string;
   type: string;
   topic: string;
+  source: string;
   opening_stock: number;
   minimum_stock: number;
   unit: string;
@@ -27,7 +28,7 @@ type MaterialForm = {
 };
 
 
-type ImportField = 'name' | 'type' | 'quantity' | 'minimum_stock' | 'unit' | 'location' | 'topic' | 'language' | 'version' | 'description';
+type ImportField = 'name' | 'type' | 'quantity' | 'minimum_stock' | 'unit' | 'location' | 'topic' | 'source' | 'language' | 'version' | 'description';
 type ImportMap = Record<ImportField, string>;
 type RawImportRow = Record<string, unknown>;
 
@@ -39,17 +40,18 @@ const importFieldLabels: Record<ImportField, string> = {
   unit: 'Unit',
   location: 'Location',
   topic: 'Topic / Program',
+  source: 'Source / Origin',
   language: 'Language',
   version: 'Year / Version',
   description: 'Description',
 };
 
 const emptyImportMap: ImportMap = {
-  name: '', type: '', quantity: '', minimum_stock: '', unit: '', location: '', topic: '', language: '', version: '', description: '',
+  name: '', type: '', quantity: '', minimum_stock: '', unit: '', location: '', topic: '', source: '', language: '', version: '', description: '',
 };
 
 const emptyMaterial: MaterialForm = {
-  name: '', type: 'Brochure', topic: '', opening_stock: 0, minimum_stock: 10,
+  name: '', type: 'Brochure', topic: '', source: '', opening_stock: 0, minimum_stock: 10,
   unit: 'copies', location: '', language: '', version: '', description: '', image_path: null,
 };
 
@@ -173,7 +175,7 @@ export default function InventoryApp() {
     const q = search.trim().toLowerCase();
     return materials.filter((m) => {
       const st = stockStatus(m).cls;
-      const text = `${m.name} ${m.type} ${m.topic ?? ''} ${m.location ?? ''}`.toLowerCase();
+      const text = `${m.name} ${m.type} ${m.topic ?? ''} ${m.source ?? ''} ${m.location ?? ''}`.toLowerCase();
       return (!q || text.includes(q)) && (!typeFilter || m.type === typeFilter) && (!stockFilter || st === stockFilter);
     });
   }, [materials, search, typeFilter, stockFilter]);
@@ -205,6 +207,7 @@ export default function InventoryApp() {
       unit: ['unit', 'uom', 'unit of measure'],
       location: ['location', 'storage location', 'shelf', 'stock location'],
       topic: ['topic', 'program', 'topic program', 'program topic'],
+      source: ['source', 'origin', 'source origin', 'iec source', 'source office', 'origin office', 'from', 'provided by', 'produced by'],
       language: ['language', 'lang'],
       version: ['year version', 'version', 'year', 'edition'],
       description: ['description', 'remarks', 'notes', 'details'],
@@ -265,6 +268,7 @@ export default function InventoryApp() {
         unit: text('unit') || 'copies',
         location: text('location') || null,
         topic: text('topic') || null,
+        source: text('source') || null,
         language: text('language') || null,
         version: text('version') || null,
         description: text('description') || null,
@@ -305,6 +309,7 @@ export default function InventoryApp() {
         name: row.name,
         type: row.type,
         topic: row.topic,
+        source: row.source,
         opening_stock: row.quantity,
         current_stock: row.quantity,
         minimum_stock: row.minimum_stock,
@@ -332,7 +337,7 @@ export default function InventoryApp() {
 
   function startEdit(item: IecMaterial) {
     setMaterialForm({
-      id: item.id, name: item.name, type: item.type, topic: item.topic ?? '', opening_stock: item.opening_stock,
+      id: item.id, name: item.name, type: item.type, topic: item.topic ?? '', source: item.source ?? '', opening_stock: item.opening_stock,
       minimum_stock: item.minimum_stock, unit: item.unit, location: item.location ?? '', language: item.language ?? '',
       version: item.version ?? '', description: item.description ?? '', image_path: item.image_path,
     });
@@ -370,6 +375,7 @@ export default function InventoryApp() {
       if (materialForm.id) {
         const { error } = await supabase.from('iec_materials').update({
           name: materialForm.name.trim(), type: materialForm.type, topic: materialForm.topic.trim() || null,
+          source: materialForm.source.trim() || null,
           minimum_stock: Number(materialForm.minimum_stock), unit: materialForm.unit.trim() || 'copies',
           location: materialForm.location.trim() || null, language: materialForm.language.trim() || null,
           version: materialForm.version.trim() || null, description: materialForm.description.trim() || null,
@@ -384,6 +390,7 @@ export default function InventoryApp() {
         const opening = Number(materialForm.opening_stock) || 0;
         const { error } = await supabase.from('iec_materials').insert({
           name: materialForm.name.trim(), type: materialForm.type, topic: materialForm.topic.trim() || null,
+          source: materialForm.source.trim() || null,
           opening_stock: opening, current_stock: opening, minimum_stock: Number(materialForm.minimum_stock) || 0,
           unit: materialForm.unit.trim() || 'copies', location: materialForm.location.trim() || null,
           language: materialForm.language.trim() || null, version: materialForm.version.trim() || null,
@@ -461,8 +468,8 @@ export default function InventoryApp() {
       const d = new Date(`${t.transaction_date}T00:00:00`);
       return `${d.toLocaleDateString(undefined, { month: 'short', day: '2-digit' })} ${t.transaction_type === 'stock_in' ? 'IN' : 'OUT'} #${i + 1}`;
     });
-    const movement: Cell[][] = [['IEC Material', 'Type', ...movementHeaders, 'Beginning Balance', 'Total In', 'Total Out', 'Net', 'Ending Balance']];
-    const summary: Cell[][] = [['IEC Material', 'Type', 'Beginning Balance', 'Stock In', 'Stock Out', 'Ending Balance', 'Minimum Stock', 'Status']];
+    const movement: Cell[][] = [['IEC Material', 'Type', 'Source / Origin', ...movementHeaders, 'Beginning Balance', 'Total In', 'Total Out', 'Net', 'Ending Balance']];
+    const summary: Cell[][] = [['IEC Material', 'Type', 'Source / Origin', 'Beginning Balance', 'Stock In', 'Stock Out', 'Ending Balance', 'Minimum Stock', 'Status']];
 
     materials.forEach((m) => {
       const txs = monthTransactions.filter((t) => t.iec_material_id === m.id);
@@ -471,22 +478,22 @@ export default function InventoryApp() {
       const begin = balanceBeforeMonth(m);
       const end = begin + totalIn - totalOutMonth;
       movement.push([
-        m.name, m.type,
+        m.name, m.type, m.source ?? '',
         ...monthTransactions.map((t) => t.iec_material_id === m.id ? (t.transaction_type === 'stock_in' ? t.quantity : -t.quantity) : ''),
         begin, totalIn, totalOutMonth, totalIn - totalOutMonth, end,
       ]);
       const status = end <= 0 ? 'Out of Stock' : end <= m.minimum_stock ? 'Low Stock' : 'In Stock';
-      summary.push([m.name, m.type, begin, totalIn, totalOutMonth, end, m.minimum_stock, status]);
+      summary.push([m.name, m.type, m.source ?? '', begin, totalIn, totalOutMonth, end, m.minimum_stock, status]);
     });
 
-    const details: Cell[][] = [['Date', 'IEC Material', 'Type', 'Movement', 'Quantity', 'Recipient / Source', 'Reference No.', 'Purpose / Notes']];
+    const details: Cell[][] = [['Date', 'IEC Material', 'Type', 'Source / Origin', 'Movement', 'Quantity', 'Recipient / Source', 'Reference No.', 'Purpose / Notes']];
     monthTransactions.forEach((t) => {
       const m = materials.find((x) => x.id === t.iec_material_id);
-      details.push([t.transaction_date, m?.name ?? 'Archived/Deleted item', m?.type ?? '', t.transaction_type === 'stock_in' ? 'Stock In' : 'Stock Out', t.quantity, t.recipient_source ?? '', t.reference_number ?? '', t.notes ?? '']);
+      details.push([t.transaction_date, m?.name ?? 'Archived/Deleted item', m?.type ?? '', m?.source ?? '', t.transaction_type === 'stock_in' ? 'Stock In' : 'Stock Out', t.quantity, t.recipient_source ?? '', t.reference_number ?? '', t.notes ?? '']);
     });
 
     downloadWorkbook(`BFAR_IEC_Monthly_Report_${reportMonth}.xlsx`, [
-      { name: 'Monthly Movement', rows: movement, movementStartCol: 2, movementEndCol: 1 + monthTransactions.length },
+      { name: 'Monthly Movement', rows: movement, movementStartCol: 3, movementEndCol: 2 + monthTransactions.length },
       { name: 'Transaction Details', rows: details },
       { name: 'Inventory Summary', rows: summary },
     ]);
@@ -541,7 +548,7 @@ export default function InventoryApp() {
             <div className="card"><div className="metric-label">Distributed</div><div className="metric-value">{totalOut}</div><div className="metric-foot">All recorded stock-out quantity</div></div>
           </div>
           <div className="grid">
-            <div className="card"><div className="section-title"><h2>Inventory Overview</h2><button className="btn secondary" onClick={() => setPage('materials')}>View all</button></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Image</th><th>Material</th><th>Type</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody>{materials.slice(0, 8).map((m) => { const st = stockStatus(m); const url = imageUrl(m.image_path); return <tr key={m.id}><td>{url ? <img className="thumb" src={url} alt="" /> : <div className="thumb image-empty">No image</div>}</td><td><strong>{m.name}</strong><div style={{ color: '#64748b', fontSize: 12 }}>{m.topic}</div></td><td>{m.type}</td><td>{m.current_stock} {m.unit}</td><td>{m.minimum_stock}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td></tr>; })}{materials.length === 0 && <tr><td colSpan={6} className="empty">No IEC materials yet.</td></tr>}</tbody></table></div></div>
+            <div className="card"><div className="section-title"><h2>Inventory Overview</h2><button className="btn secondary" onClick={() => setPage('materials')}>View all</button></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Image</th><th>Material</th><th>Type</th><th>Stock</th><th>Minimum</th><th>Status</th></tr></thead><tbody>{materials.slice(0, 8).map((m) => { const st = stockStatus(m); const url = imageUrl(m.image_path); return <tr key={m.id}><td>{url ? <img className="thumb" src={url} alt="" /> : <div className="thumb image-empty">No image</div>}</td><td><strong>{m.name}</strong><div style={{ color: '#64748b', fontSize: 12 }}>{m.topic}{m.source ? ` · ${m.source}` : ''}</div></td><td>{m.type}</td><td>{m.current_stock} {m.unit}</td><td>{m.minimum_stock}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td></tr>; })}{materials.length === 0 && <tr><td colSpan={6} className="empty">No IEC materials yet.</td></tr>}</tbody></table></div></div>
             <div className="card"><div className="section-title"><h2>Recent Activity</h2></div><div className="activity">{recentTransactions.map((t) => { const m = materials.find((x) => x.id === t.iec_material_id); const signed = t.transaction_type === 'stock_in' ? `+${t.quantity}` : `−${t.quantity}`; return <div className="activity-item" key={t.id}><strong>{signed} — {m?.name ?? 'Archived item'}</strong><span>{fmtDate(t.transaction_date)} · {t.transaction_type === 'stock_in' ? 'Stock In' : 'Stock Out'}{t.recipient_source ? ` · ${t.recipient_source}` : ''}</span></div>; })}{recentTransactions.length === 0 && <div className="empty">No transactions yet.</div>}</div></div>
           </div>
         </>}
@@ -572,7 +579,7 @@ export default function InventoryApp() {
           </div>}
 
           <div className="grid">
-            <div className="card"><div className="section-title"><h2>Inventory List</h2></div><div className="toolbar"><input placeholder="Search material, topic, location…" value={search} onChange={(e) => setSearch(e.target.value)} /><select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="">All Types</option>{types.map((t) => <option key={t}>{t}</option>)}</select><select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}><option value="">All Stock</option><option value="ok">In Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option></select></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Image</th><th>Name</th><th>Type</th><th>Quantity</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filteredMaterials.map((m) => { const st = stockStatus(m); const url = imageUrl(m.image_path); return <tr key={m.id}><td>{url ? <img className="thumb" src={url} alt="" /> : <div className="thumb image-empty">No image</div>}</td><td><strong>{m.name}</strong><div style={{ color: '#64748b', fontSize: 12 }}>{m.topic}</div></td><td>{m.type}</td><td>{m.current_stock} {m.unit}</td><td>{m.location || '—'}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td><td><div className="row-actions">{canEdit && <button className="btn secondary" onClick={() => startEdit(m)}>Edit</button>}{canAdmin && <button className="btn danger" onClick={() => archiveMaterial(m)}>Archive</button>}</div></td></tr>; })}{filteredMaterials.length === 0 && <tr><td colSpan={7} className="empty">No matching IEC materials.</td></tr>}</tbody></table></div></div>
+            <div className="card"><div className="section-title"><h2>Inventory List</h2></div><div className="toolbar"><input placeholder="Search material, source, topic, location…" value={search} onChange={(e) => setSearch(e.target.value)} /><select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="">All Types</option>{types.map((t) => <option key={t}>{t}</option>)}</select><select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}><option value="">All Stock</option><option value="ok">In Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option></select></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Image</th><th>Name</th><th>Type</th><th>Source / Origin</th><th>Quantity</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody>{filteredMaterials.map((m) => { const st = stockStatus(m); const url = imageUrl(m.image_path); return <tr key={m.id}><td>{url ? <img className="thumb" src={url} alt="" /> : <div className="thumb image-empty">No image</div>}</td><td><strong>{m.name}</strong><div style={{ color: '#64748b', fontSize: 12 }}>{m.topic}</div></td><td>{m.type}</td><td>{m.source || '—'}</td><td>{m.current_stock} {m.unit}</td><td>{m.location || '—'}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td><td><div className="row-actions">{canEdit && <button className="btn secondary" onClick={() => startEdit(m)}>Edit</button>}{canAdmin && <button className="btn danger" onClick={() => archiveMaterial(m)}>Archive</button>}</div></td></tr>; })}{filteredMaterials.length === 0 && <tr><td colSpan={8} className="empty">No matching IEC materials.</td></tr>}</tbody></table></div></div>
 
             <div className="card">
               <div className="section-title"><h2>{materialForm.id ? 'Edit IEC Material' : 'Add IEC Material'}</h2></div>
@@ -583,6 +590,7 @@ export default function InventoryApp() {
                   <label>Material Name<input required value={materialForm.name} onChange={(e) => setMaterialForm({ ...materialForm, name: e.target.value })} /></label>
                   <label>Type<select value={materialForm.type} onChange={(e) => setMaterialForm({ ...materialForm, type: e.target.value })}><option>Brochure</option><option>Flyer</option><option>Poster</option><option>Booklet</option><option>Manual</option><option>Tarpaulin</option><option>Sticker</option><option>Infographic</option><option>Other</option></select></label>
                   <label>Topic / Program<input value={materialForm.topic} onChange={(e) => setMaterialForm({ ...materialForm, topic: e.target.value })} /></label>
+                  <label>Source / Origin<input value={materialForm.source} onChange={(e) => setMaterialForm({ ...materialForm, source: e.target.value })} placeholder="e.g. BFAR Central Office, BFAR 4A, LGU, partner agency" /></label>
                   {!materialForm.id && <label>Initial Quantity<input type="number" min="0" value={materialForm.opening_stock} onChange={(e) => setMaterialForm({ ...materialForm, opening_stock: Number(e.target.value) })} /></label>}
                   <label>Minimum Stock<input type="number" min="0" value={materialForm.minimum_stock} onChange={(e) => setMaterialForm({ ...materialForm, minimum_stock: Number(e.target.value) })} /></label>
                   <label>Unit<input value={materialForm.unit} onChange={(e) => setMaterialForm({ ...materialForm, unit: e.target.value })} /></label>
@@ -607,8 +615,8 @@ export default function InventoryApp() {
 
         {page === 'reports' && <>
           <div className="topbar"><div><h1>Reports</h1><p>Generate a monthly Excel workbook with horizontal transaction-date columns.</p></div><button className="btn" onClick={exportMonthlyExcel}>Export Monthly Excel (.xlsx)</button></div>
-          <div className="card page-card-spacer"><div className="section-title"><h2>Monthly Transaction Report</h2></div><div className="notice">Each transaction is a separate horizontal column. Positive values are Stock In; negative values are Stock Out.</div><div className="toolbar"><label style={{ minWidth: 220 }}>Report Month<input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} /></label></div><div className="table-wrap"><table className="data-table"><thead><tr><th>IEC Material</th><th>Type</th>{monthTransactions.map((t, i) => <th key={t.id}>{new Date(`${t.transaction_date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })} {t.transaction_type === 'stock_in' ? 'IN' : 'OUT'} #{i + 1}</th>)}<th>Total In</th><th>Total Out</th><th>Net</th></tr></thead><tbody>{materials.map((m) => { const txs = monthTransactions.filter((t) => t.iec_material_id === m.id); const tin = txs.filter((t) => t.transaction_type === 'stock_in').reduce((s, t) => s + t.quantity, 0); const tout = txs.filter((t) => t.transaction_type === 'stock_out').reduce((s, t) => s + t.quantity, 0); return <tr key={m.id}><td><strong>{m.name}</strong></td><td>{m.type}</td>{monthTransactions.map((t) => <td key={t.id} className="signed-move">{t.iec_material_id === m.id ? (t.transaction_type === 'stock_in' ? `+${t.quantity}` : `−${t.quantity}`) : ''}</td>)}<td>{tin || ''}</td><td>{tout || ''}</td><td>{tin - tout}</td></tr>; })}{materials.length === 0 && <tr><td className="empty" colSpan={6 + monthTransactions.length}>No inventory records.</td></tr>}</tbody></table></div><div className="report-summary">{monthTransactions.length} transaction{monthTransactions.length === 1 ? '' : 's'} in {reportMonth}.</div></div>
-          <div className="card"><div className="section-title"><h2>Current Inventory</h2></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Material</th><th>Type</th><th>Topic</th><th>Current Stock</th><th>Minimum</th><th>Location</th><th>Status</th></tr></thead><tbody>{materials.map((m) => { const st = stockStatus(m); return <tr key={m.id}><td>{m.name}</td><td>{m.type}</td><td>{m.topic || '—'}</td><td>{m.current_stock} {m.unit}</td><td>{m.minimum_stock}</td><td>{m.location || '—'}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td></tr>; })}</tbody></table></div></div>
+          <div className="card page-card-spacer"><div className="section-title"><h2>Monthly Transaction Report</h2></div><div className="notice">Each transaction is a separate horizontal column. Positive values are Stock In; negative values are Stock Out.</div><div className="toolbar"><label style={{ minWidth: 220 }}>Report Month<input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} /></label></div><div className="table-wrap"><table className="data-table"><thead><tr><th>IEC Material</th><th>Type</th><th>Source / Origin</th>{monthTransactions.map((t, i) => <th key={t.id}>{new Date(`${t.transaction_date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: '2-digit' })} {t.transaction_type === 'stock_in' ? 'IN' : 'OUT'} #{i + 1}</th>)}<th>Total In</th><th>Total Out</th><th>Net</th></tr></thead><tbody>{materials.map((m) => { const txs = monthTransactions.filter((t) => t.iec_material_id === m.id); const tin = txs.filter((t) => t.transaction_type === 'stock_in').reduce((s, t) => s + t.quantity, 0); const tout = txs.filter((t) => t.transaction_type === 'stock_out').reduce((s, t) => s + t.quantity, 0); return <tr key={m.id}><td><strong>{m.name}</strong></td><td>{m.type}</td><td>{m.source || '—'}</td>{monthTransactions.map((t) => <td key={t.id} className="signed-move">{t.iec_material_id === m.id ? (t.transaction_type === 'stock_in' ? `+${t.quantity}` : `−${t.quantity}`) : ''}</td>)}<td>{tin || ''}</td><td>{tout || ''}</td><td>{tin - tout}</td></tr>; })}{materials.length === 0 && <tr><td className="empty" colSpan={7 + monthTransactions.length}>No inventory records.</td></tr>}</tbody></table></div><div className="report-summary">{monthTransactions.length} transaction{monthTransactions.length === 1 ? '' : 's'} in {reportMonth}.</div></div>
+          <div className="card"><div className="section-title"><h2>Current Inventory</h2></div><div className="table-wrap"><table className="data-table"><thead><tr><th>Material</th><th>Type</th><th>Source / Origin</th><th>Topic</th><th>Current Stock</th><th>Minimum</th><th>Location</th><th>Status</th></tr></thead><tbody>{materials.map((m) => { const st = stockStatus(m); return <tr key={m.id}><td>{m.name}</td><td>{m.type}</td><td>{m.source || '—'}</td><td>{m.topic || '—'}</td><td>{m.current_stock} {m.unit}</td><td>{m.minimum_stock}</td><td>{m.location || '—'}</td><td><span className={`badge ${st.cls}`}>{st.label}</span></td></tr>; })}</tbody></table></div></div>
         </>}
       </main>
     </div>

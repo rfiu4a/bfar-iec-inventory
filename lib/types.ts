@@ -11,6 +11,7 @@ export type IecMaterial = {
   name: string;
   type: string;
   topic: string | null;
+  source: string | null;
   opening_stock: number;
   current_stock: number;
   minimum_stock: number;

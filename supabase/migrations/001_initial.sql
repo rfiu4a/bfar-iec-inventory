@@ -16,6 +16,7 @@ create table if not exists public.iec_materials (
   name text not null,
   type text not null,
   topic text,
+  source text,
   opening_stock integer not null default 0 check (opening_stock >= 0),
   current_stock integer not null default 0 check (current_stock >= 0),
   minimum_stock integer not null default 10 check (minimum_stock >= 0),
